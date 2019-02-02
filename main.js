@@ -9,12 +9,24 @@ let shaderProgram;
 let vert;
 let frag;
 
+const vertSource = `
+attribute vec4 aVertexPosition;
+
+uniform mat4 uModelViewMatrix;
+uniform mat4 uProjectionMatrix;
+
+void main() {
+  gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
+}
+`;
+const fragSource = `
+void main() {
+  gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+}
+`;
+
 //Functions
-
-
-init();
-
-init = {
+function init(){
     canvas = document.querySelector("#glCanvas");
     gl = canvas.getContext("webgl");
 
@@ -26,6 +38,43 @@ init = {
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     shaderProgram = initShaders(gl, vertSource, fragSource);
+
+    const programInfo = {
+        program: shaderProgram,
+        attribLocations: {
+            vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
+        },
+        uniformLocations: {
+            projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
+            modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
+        },
+    };
+
+}
+
+function update(){
+
+}
+
+function draw(){
+    gl.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
+    gl.clearDepth(1.0);                 // Clear everything
+    gl.enable(gl.DEPTH_TEST);           // Enable depth testing
+    gl.depthFunc(gl.LEQUAL);            // Near things obscure far things
+
+    const fieldOfView = 45 * Math.PI / 180;   // in radians
+    const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+    const zNear = 0.1;
+    const zFar = 100.0;
+    const projectionMatrix = mat4.create();
+
+    mat4.perspective(
+        projectionMatrix,
+        fieldOfView,
+        aspect,
+        zNear,
+        zFar
+    );
 }
 
 function initShaders(instance, vertexSource, fragmentSource){
@@ -47,7 +96,7 @@ function initShaders(instance, vertexSource, fragmentSource){
 function loadShader(instance, type, source){
     const shader = instance.createShader(type);
 
-    instance.compileSource(shader, source);
+    instance.shaderSource(shader, source);
 
     instance.compileShader(shader);
 
@@ -60,19 +109,31 @@ function loadShader(instance, type, source){
     return shader;
 }
 
-const vertSource = `
-    attribute vec4 aVertexPosition;
+function initBuffers(gl) {
+    const positionBuffer = gl.createBuffer();
 
-    uniform mat4 uModelViewMatrix;
-    uniform mat4 uProjectionMatrix;
+    // Select the positionBuffer as the one to apply buffer
+    // operations to from here out.
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
 
-    void main() {
-      gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
-    }
-`;
+    const positions = [
+        -1.0,  1.0,
+         1.0,  1.0,
+        -1.0, -1.0,
+         1.0, -1.0,
+    ];
 
-const fragSource = `
-    void main() {
-      gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
-    }
-`;
+    // Now pass the list of positions into WebGL to build the
+    // shape. We do this by creating a Float32Array from the
+    // JavaScript array, then use it to fill the current buffer
+    gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array(positions),
+        gl.STATIC_DRAW);
+
+    return {
+        position: positionBuffer,
+    };
+}
+
+window.onload = init();
