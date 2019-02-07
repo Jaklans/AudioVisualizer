@@ -1,54 +1,47 @@
 "use strict"
 
 //WebGL Environment
-let canvas;
 let gl;
-let shaderProgram;
-
-//Shaders
-let vert;
-let frag;
-
-const vertSource = `
-attribute vec4 aVertexPosition;
-
-uniform mat4 uModelViewMatrix;
-uniform mat4 uProjectionMatrix;
-
-void main() {
-  gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
-}
-`;
-const fragSource = `
-void main() {
-  gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
-}
-`;
+let shader;
+let buffers;
 
 //Functions
 function init(){
-    canvas = document.querySelector("#glCanvas");
-    gl = canvas.getContext("webgl");
+    gl = document.querySelector("#glCanvas").getContext("webgl");
 
     if(gl === null){
-        //Alert user
+        alert("WebGL is required to run this app!");
     }
 
-    gl.clearColor(0.39, .58, 0.93, 1.0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    const vertSource = `
+        attribute vec4 aVertexPosition;
 
-    shaderProgram = initShaders(gl, vertSource, fragSource);
+        uniform mat4 uModelViewMatrix;
+        uniform mat4 uProjectionMatrix;
 
-    const programInfo = {
+        void main() {
+            gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
+    }`;
+    const fragSource = `
+        void main() {
+            gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+    }`;
+
+    const shaderProgram = initShaders(gl, vertSource, fragSource);
+    
+    shader = {
         program: shaderProgram,
         attribLocations: {
-            vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
+            vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition')
         },
         uniformLocations: {
             projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
-            modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
+            modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix')
         },
     };
+    
+    buffers = initBuffers(gl);
+
     update();
 }
 
@@ -62,6 +55,8 @@ function draw(){
     gl.clearDepth(1.0);                 // Clear everything
     gl.enable(gl.DEPTH_TEST);           // Enable depth testing
     gl.depthFunc(gl.LEQUAL);            // Near things obscure far things
+
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     const fieldOfView = 45 * Math.PI / 180;   // in radians
     const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
@@ -82,7 +77,7 @@ function draw(){
     mat4.translate(
         modelViewMatrix, // Destination
         modelViewMatrix, // Source
-        [0,0,-6]
+        [0.0,0.0,-6.0]
     );
     {
         const numComponents = 2;
@@ -92,41 +87,42 @@ function draw(){
         const offset = 0;
 
         gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.indices);
         gl.vertexAttribPointer(
-            programInfo.attribLocations.vertexPosition,
+            shader.attribLocations.vertexPosition,
             numComponents,
             type,
             normalize,
             stride,
             offset
         );
+        gl.enableVertexAttribArray(shader.attribLocations.vertexPosition);
     }
 
-    gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
-
-    gl.useProgram(programInfo.program);
+    gl.useProgram(shader.program);
 
     gl.uniformMatrix4fv(
-        programInfo.uniformLocations.projectionMatrix,
+        shader.uniformLocations.projectionMatrix,
         false, 
         projectionMatrix
     )
     gl.uniformMatrix4fv(
-        programInfo.uniformLocations.modelViewMatrix,
+        shader.uniformLocations.modelViewMatrix,
         false, 
         modelViewMatrix
     );
 
     {
+        const indexCount = 6;
+        const type = gl.UNSIGNED_SHORT;
         const offset = 0;
-        const vertexCount = 4;
-        gl.drawArrays(gl.TRIANGLE_STRIP, offset, vertexCount);
+        gl.drawElements(gl.TRIANGLES,indexCount,type,offset);
     }
 }
 
-function initShaders(instance, vertexSource, fragmentSource){
-    vert = loadShader(gl, gl.VERTEX_SHADER, vertexSource);
-    frag = loadShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
+function initShaders(gl, vertexSource, fragmentSource){
+    let vert = loadShader(gl, gl.VERTEX_SHADER, vertexSource);
+    let frag = loadShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
 
     const shaderProgram = gl.createProgram();
     gl.attachShader(shaderProgram, vert);
@@ -140,16 +136,16 @@ function initShaders(instance, vertexSource, fragmentSource){
     return shaderProgram;
 }
 
-function loadShader(instance, type, source){
-    const shader = instance.createShader(type);
+function loadShader(gl, type, source){
+    const shader = gl.createShader(type);
 
-    instance.shaderSource(shader, source);
+    gl.shaderSource(shader, source);
 
-    instance.compileShader(shader);
+    gl.compileShader(shader);
 
-    if (!instance.getShaderParameter(shader, instance.COMPILE_STATUS)){
-        alert("A shader failed to compile: " + instance.getShaderInfoLog(shader));
-        instance.deleteShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)){
+        alert("A shader failed to compile: " + gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
         return null;
     }
 
@@ -159,28 +155,42 @@ function loadShader(instance, type, source){
 function initBuffers(gl) {
     const positionBuffer = gl.createBuffer();
 
-    // Select the positionBuffer as the one to apply buffer
-    // operations to from here out.
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
 
     const positions = [
         -1.0,  1.0,
          1.0,  1.0,
         -1.0, -1.0,
-         1.0, -1.0,
+         1.0, -1.0
     ];
 
-    // Now pass the list of positions into WebGL to build the
-    // shape. We do this by creating a Float32Array from the
-    // JavaScript array, then use it to fill the current buffer
     gl.bufferData(
         gl.ARRAY_BUFFER,
         new Float32Array(positions),
-        gl.STATIC_DRAW);
+        gl.STATIC_DRAW
+    );
+
+    const indexBuffer = gl.createBuffer();;
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+
+    const indices = [
+        0, 1, 2,
+        1, 2, 3
+    ];
+
+    gl.bufferData(
+        gl.ELEMENT_ARRAY_BUFFER,
+        new Uint16Array(indices),
+        gl.STATIC_DRAW
+    );
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
 
     return {
         position: positionBuffer,
+        indices: indexBuffer
     };
 }
 
-window.onload = init();
+window.onload = init;
