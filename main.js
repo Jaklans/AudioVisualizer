@@ -19,15 +19,43 @@ function init(){
         uniform mat4 uModelViewMatrix;
         uniform mat4 uProjectionMatrix;
 
+        varying lowp vec2 text_coord;
+
         void main() {
+            text_coord = vec2(1,0);
             gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
-    }`;
+        }`;
     const fragSource = `
         void main() {
             gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
-    }`;
+        }`;
+    const fragJuliaSource = `
+        uniform sampler2D tex;
+        uniform lowp vec2 c;
+        uniform int iter;
 
-    const shaderProgram = initShaders(gl, vertSource, fragSource);
+        varying lowp vec2 text_coord;
+
+        void main() {
+            lowp vec2 z;
+            z.x = 3.0 * (text_coord.x - 0.5);
+            z.y = 2.0 * (text_coord.y - 0.5);
+
+            for(int i = 0; i < iter; i++) {
+                lowp float x = (z.x * z.x - z.y * z.y) + c.x;
+                lowp float y = (z.y * z.x + z.x * z.y) + c.y;
+
+                if((x * x + y * y) > 4.0) break;
+                z.x = x;
+                z.y = y;
+
+                gl_FragColor = texture2D(tex, vec2((i == iter ? 0.0 : float(i)) / 100.0, 0.5));
+            }
+        }`;
+//https://stackoverflow.com/questions/11216912/webgl-shader-errors
+//http://nuclear.mutantstargoat.com/articles/sdr_fract/
+//https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial/Using_shaders_to_apply_color_in_WebGL
+    const shaderProgram = initShaders(gl, vertSource, fragJuliaSource);
     
     shader = {
         program: shaderProgram,
