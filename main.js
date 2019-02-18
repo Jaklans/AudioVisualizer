@@ -2,8 +2,13 @@
 
 //WebGL Environment
 let gl;
-let shader;
 let buffers;
+
+//Shaders
+let JuliaShader;
+
+//Assets
+let JuliaSampler
 
 //Functions
 function init(){
@@ -15,11 +20,12 @@ function init(){
 
     const vertSource = `
         attribute vec4 aVertexPosition;
+        attribute vec4 inputTexCoord;
 
         uniform mat4 uModelViewMatrix;
         uniform mat4 uProjectionMatrix;
 
-        varying lowp vec2 text_coord;
+        varying lowp vec2 textCoord;
 
         void main() {
             text_coord = vec2(1,0);
@@ -30,17 +36,18 @@ function init(){
             gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
         }`;
     const fragJuliaSource = `
-        uniform sampler2D tex;
+        uniform sampler2D textureSampler;
         uniform lowp vec2 c;
-        uniform int iter;
 
-        varying lowp vec2 text_coord;
+        varying lowp vec2 textCoord;
 
         void main() {
+            const lowp int iter = 100;
             lowp vec2 z;
-            z.x = 3.0 * (text_coord.x - 0.5);
-            z.y = 2.0 * (text_coord.y - 0.5);
+            z.x = 3.0 * (textCoord.x - 0.5);
+            z.y = 2.0 * (textCoord.y - 0.5);
 
+            lowp int final;
             for(int i = 0; i < iter; i++) {
                 lowp float x = (z.x * z.x - z.y * z.y) + c.x;
                 lowp float y = (z.y * z.x + z.x * z.y) + c.y;
@@ -49,24 +56,49 @@ function init(){
                 z.x = x;
                 z.y = y;
 
-                gl_FragColor = texture2D(tex, vec2((i == iter ? 0.0 : float(i)) / 100.0, 0.5));
+                final = i;
             }
+
+            gl_FragColor = texture2D(textureSampler, vec2((final == iter ? 0.0 : float(final)) / 100.0, 0.5));
+            //gl_FragColor = vec4(float(final) / 100.0,0.0,0.0,1.0);
         }`;
+//https://stackoverflow.com/questions/17537879/in-webgl-what-are-the-differences-between-an-attribute-a-uniform-and-a-varying
 //https://stackoverflow.com/questions/11216912/webgl-shader-errors
 //http://nuclear.mutantstargoat.com/articles/sdr_fract/
 //https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial/Using_shaders_to_apply_color_in_WebGL
+//https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial/Using_textures_in_WebGL
     const shaderProgram = initShaders(gl, vertSource, fragJuliaSource);
     
-    shader = {
+    JuliaShader = {
         program: shaderProgram,
         attribLocations: {
-            vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition')
+            vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
+            textureCoord: gl.getAttribLocation(shaderProgram, 'inputTexCoord')
         },
         uniformLocations: {
             projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
-            modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix')
+            modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
+            textureSampler: gl.getUniformLocation(shaderProgram, 'textureSampler')
         },
     };
+
+    //Create Texture for Julia Fractal
+    {
+        JuliaSampler = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, JuliaSampler);
+        const level = 0;
+        const width = 2;
+        const height = 1;
+        const values = new Uint8Array([
+            255, 0, 0, 255,
+            0, 255, 0, 255
+        ]);
+        gl.texImage2D(gl.TEXTURE_2D, level, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, values);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    }
     
     buffers = initBuffers(gl);
 
@@ -86,12 +118,12 @@ function draw(){
 
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
+    //Create ModelView Matrix
     const fieldOfView = 45 * Math.PI / 180;   // in radians
     const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
     const zNear = 0.1;
     const zFar = 100.0;
     const projectionMatrix = mat4.create();
-
     mat4.perspective(
         projectionMatrix,
         fieldOfView,
@@ -99,14 +131,18 @@ function draw(){
         zNear,
         zFar
     );
-
     const modelViewMatrix = mat4.create();
-
     mat4.translate(
         modelViewMatrix, // Destination
         modelViewMatrix, // Source
         [0.0,0.0,-6.0]
     );
+
+    gl.useProgram(JuliaShader.program);
+
+    //Attributes--------------------------------------------------------------
+
+    //Send Vertex Buffer to Vertex Shader
     {
         const numComponents = 2;
         const type = gl.FLOAT;
@@ -117,29 +153,42 @@ function draw(){
         gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.indices);
         gl.vertexAttribPointer(
-            shader.attribLocations.vertexPosition,
+            JuliaShader.attribLocations.vertexPosition,
             numComponents,
             type,
             normalize,
             stride,
             offset
         );
-        gl.enableVertexAttribArray(shader.attribLocations.vertexPosition);
+        gl.enableVertexAttribArray(JuliaShader.attribLocations.vertexPosition);
+    }
+    //Send Texture Coordinates to Vertex Shader
+    {
+        gl.bindBuffer(gl.ARRAY_BUFFER, bu)
     }
 
-    gl.useProgram(shader.program);
-
+    //Uniforms-----------------------------------------------------------------
+    //Send Projection Matrix to Vertex Shader
     gl.uniformMatrix4fv(
-        shader.uniformLocations.projectionMatrix,
+        JuliaShader.uniformLocations.projectionMatrix,
         false, 
         projectionMatrix
     )
+    //Send ModelView Matrix to Vertex Shader
     gl.uniformMatrix4fv(
-        shader.uniformLocations.modelViewMatrix,
+        JuliaShader.uniformLocations.modelViewMatrix,
         false, 
         modelViewMatrix
     );
+    //Send c to Pixel Shader
+    //Send Texture Sampler to Pixel Shader
+    {
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, JuliaSampler);
+        gl.uniform1i(JuliaShader.uniformLocations.textureSampler, 0);
+    }
 
+    //Draw Call
     {
         const indexCount = 6;
         const type = gl.UNSIGNED_SHORT;
@@ -215,9 +264,27 @@ function initBuffers(gl) {
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
 
+    const indexBuffer = gl.createBuffer();;
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+
+    const indices = [
+        0, 1, 2,
+        1, 2, 3
+    ];
+
+    gl.bufferData(
+        gl.ELEMENT_ARRAY_BUFFER,
+        new Uint16Array(indices),
+        gl.STATIC_DRAW
+    );
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+
     return {
         position: positionBuffer,
         indices: indexBuffer
+        textureCoords: 
     };
 }
 
