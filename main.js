@@ -38,35 +38,31 @@ function init(){
         }`;
     const fragJuliaSource = `
         uniform sampler2D textureSampler;
-        uniform highp vec2 c;
+        uniform highp vec2 uSeed;
 
         varying highp vec2 textCoord;
         varying lowp vec4 vColor;
 
         void main() {
-            gl_FragColor = vColor;
-            return;
-            const mediump int itter = 17;
+            const mediump int itter = 200;
 
             highp vec2 z = vec2(0.0, 0.0);
             z.x = 3.0 * (textCoord.x - 0.5);
             z.y = 2.0 * (textCoord.y - 0.5);
-            //gl_FragColor = vec4(0.0, 0.0, 1.0, 1.0);
+            
             mediump int final;
             for(int i = 0; i < itter; i++) {
-                lowp float x = (z.x * z.x - z.y * z.y) + c.x;
-                lowp float y = (z.y * z.x + z.x * z.y) + c.y;
+                final = i;
+                lowp float x = (z.x * z.x - z.y * z.y) - uSeed.x;
+                lowp float y = (z.y * z.x + z.x * z.y) - uSeed.y;
 
-                if((x * x + y * y) > 4.0) return;
+                if((x * x + y * y) > 4.0) break;
                 z.x = x;
                 z.y = y;
-
-                final = i;
             }
             highp float finalf = float(final);
-            //gl_FragColor = texture2D(textureSampler, vec2((final == itter ? 0.0 : finalf) / 100.0, 0.5));
-            gl_FragColor = vec4(finalf / 50.0, 0.0, 0.0, 1.0);
-            //gl_FragColor = vec4(final / 100.0, 0.0, 0.0, 1.0);
+            //gl_FragColor = texture2D(textureSampler, vec2((final == itter ? 0.0 : finalf) / 200.0, 0.5));
+            gl_FragColor = texture2D(textureSampler, vec2(finalf / 400.0, 0.5));
         }`;
 //https://stackoverflow.com/questions/17537879/in-webgl-what-are-the-differences-between-an-attribute-a-uniform-and-a-varying
 //https://stackoverflow.com/questions/11216912/webgl-shader-errors
@@ -86,7 +82,7 @@ function init(){
             projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
             modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
             textureSampler: gl.getUniformLocation(shaderProgram, 'textureSampler'),
-            seed: gl.getUniformLocation(shaderProgram, 'c')
+            seed: gl.getUniformLocation(shaderProgram, 'uSeed')
         },
     };
 
@@ -154,7 +150,7 @@ function draw(){
     mat4.translate(
         modelViewMatrix, // Destination
         modelViewMatrix, // Source
-        [0.0,0.0,-6.0]
+        [0.0,0.0,-2.0]
     );
 
     gl.useProgram(JuliaShader.program);
@@ -235,16 +231,11 @@ function draw(){
         gl.uniform1i(JuliaShader.uniformLocations.textureSampler, 0);
     }
     //Send Seed to Pixel Shader
-    {
-        const seed = vec2.create();
-        vec2.x = .823459623;
-        vec2.y = .125095467;
-        gl.uniformMatrix4fv(
-            JuliaShader.uniformLocations.modelViewMatrix,
-            false, 
-            modelViewMatrix
-        );
-    }
+    gl.uniform2f(
+        JuliaShader.uniformLocations.seed,
+        .723459623,
+        .125095467
+    );
 
     //Draw Call
     {
@@ -253,6 +244,8 @@ function draw(){
         const offset = 0;
         gl.drawElements(gl.TRIANGLES,indexCount,type,offset);
     }
+
+    requestAnimationFrame(update);
 }
 
 function initShaders(gl, vertexSource, fragmentSource){
