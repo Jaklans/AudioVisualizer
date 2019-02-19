@@ -19,16 +19,16 @@ function init(){
     }
 
     const vertSource = `
-        attribute vec4 aVertexPosition;
-        attribute vec2 aTexCoord;
+        attribute highp vec4 aVertexPosition;
+        attribute highp vec2 aTexCoord;
 
-        uniform mat4 uModelViewMatrix;
-        uniform mat4 uProjectionMatrix;
+        uniform highp mat4 uModelViewMatrix;
+        uniform highp mat4 uProjectionMatrix;
 
         varying highp vec2 textCoord;
 
         void main() {
-            textCoord = vec2((aVertexPosition + 1.0) / 2.0);
+            textCoord = vec2(aTexCoord);
             gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
         }`;
     const fragSource = `
@@ -46,7 +46,7 @@ function init(){
             highp vec2 z;
             z.x = 3.0 * (textCoord.x - 0.5);
             z.y = 2.0 * (textCoord.y - 0.5);
-            gl_FragColor = vec4(gl_FragCoord.x, 0.0, 0.0, 1.0);
+            gl_FragColor = vec4(gl_FragCoord.y, gl_FragCoord.x, 0.0, 1.0);
             return;
             highp int final;
             for(int i = 0; i < iter; i++) {
@@ -73,7 +73,7 @@ function init(){
     JuliaShader = {
         program: shaderProgram,
         attribLocations: {
-            vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
+            vertexPosition: gl.getAttribLocation(shaderProgram, "aVertexPosition"),
             textureCoord: gl.getAttribLocation(shaderProgram, 'aTexCoord')
         },
         uniformLocations: {
@@ -124,7 +124,7 @@ function update(){
 }
 
 function draw(){
-    gl.clearColor(0.0, 0.0, 0.1, 1.0);  // Clear to black, fully opaque
+    gl.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
     gl.clearDepth(1.0);                 // Clear everything
     gl.enable(gl.DEPTH_TEST);           // Enable depth testing
     gl.depthFunc(gl.LEQUAL);            // Near things obscure far things
