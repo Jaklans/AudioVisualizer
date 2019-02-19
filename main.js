@@ -19,16 +19,19 @@ function init(){
     }
 
     const vertSource = `
-        attribute highp vec4 aVertexPosition;
-        attribute highp vec2 aTexCoord;
+        attribute vec4 aVertexPosition;
+        attribute vec2 aTexCoord;
+        attribute vec4 aVertexColor;
 
         uniform highp mat4 uModelViewMatrix;
         uniform highp mat4 uProjectionMatrix;
 
         varying highp vec2 textCoord;
+        varying lowp vec4 vColor;
 
         void main() {
             textCoord = vec2(aTexCoord);
+            vColor = aVertexColor;
             gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
         }`;
     const fragSource = `
@@ -40,14 +43,19 @@ function init(){
         uniform highp vec2 c;
 
         varying highp vec2 textCoord;
+        varying lowp vec4 vColor;
 
         void main() {
+            gl_FragColor = vec4(vColor);
+            return;
             const highp int iter = 11000;
             highp vec2 z;
             z.x = 3.0 * (textCoord.x - 0.5);
             z.y = 2.0 * (textCoord.y - 0.5);
+
             gl_FragColor = vec4(gl_FragCoord.y, gl_FragCoord.x, 0.0, 1.0);
             return;
+
             highp int final;
             for(int i = 0; i < iter; i++) {
                 lowp float x = (z.x * z.x - z.y * z.y) + c.x;
@@ -74,7 +82,8 @@ function init(){
         program: shaderProgram,
         attribLocations: {
             vertexPosition: gl.getAttribLocation(shaderProgram, "aVertexPosition"),
-            textureCoord: gl.getAttribLocation(shaderProgram, 'aTexCoord')
+            textureCoord: gl.getAttribLocation(shaderProgram, 'aTexCoord'),
+            vertexColor: gl.getAttribLocation(shaderProgram, "aVertexColor")
         },
         uniformLocations: {
             projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
@@ -152,9 +161,7 @@ function draw(){
     );
 
     gl.useProgram(JuliaShader.program);
-
     //Attributes--------------------------------------------------------------
-
     //Send Vertex Buffer to Vertex Shader
     {
         const numComponents = 2;
@@ -184,10 +191,32 @@ function draw(){
         const offset = 0;
 
         gl.bindBuffer(gl.ARRAY_BUFFER, buffers.textureCoords);
-        gl.vertexAttribPointer(JuliaShader.attribLocations.textureCoord, numComponents, type, normalize, stride, offset);
+        gl.vertexAttribPointer(JuliaShader.attribLocations.textureCoord, 
+            numComponents, 
+            type, 
+            normalize, 
+            stride, 
+            offset);
         gl.enableVertexAttribArray(JuliaShader.attribLocations.textureCoord);
     }
-    
+    //Send Color to Vertex Shader
+    {
+        const numComponents = 4;
+        const type = gl.FLOAT;
+        const normalize = false;
+        const stride = 0;
+        const offset = 0;
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffers.color);
+        gl.vertexAttribPointer(
+            JuliaShader.attribLocations.vertexColor,
+            numComponents,
+            type,
+            normalize,
+            stride,
+            offset);
+        gl.enableVertexAttribArray(
+            JuliaShader.attribLocations.vertexColor);
+      }
     //Uniforms-----------------------------------------------------------------
     //Send Projection Matrix to Vertex Shader
     gl.uniformMatrix4fv(
@@ -262,59 +291,70 @@ function loadShader(gl, type, source){
 }
 
 function initBuffers(gl) {
-    const positionBuffer = gl.createBuffer();
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-
+    //Create Position Buffer
     const positions = [
         -1.0,  1.0,
          1.0,  1.0,
         -1.0, -1.0,
          1.0, -1.0
     ];
-
+    const positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.bufferData(
         gl.ARRAY_BUFFER,
         new Float32Array(positions),
         gl.STATIC_DRAW
     );
 
-    const indexBuffer = gl.createBuffer();;
-
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-
+    //Create Index Buffer
     const indices = [
         0, 1, 2,
         1, 2, 3
     ];
-
+    const indexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
     gl.bufferData(
         gl.ELEMENT_ARRAY_BUFFER,
         new Uint16Array(indices),
         gl.STATIC_DRAW
     );
 
-    const texCoordBuffer = gl.createBuffer();;
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
-
+    //Create Texture Coordinate Buffer
     const coordinates = [
         0.0, 0.0,
         1.0, 0.0,
         0.0, 1.0,
         1.0, 1.0
     ];
-
+    const texCoordBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
     gl.bufferData(
         gl.ARRAY_BUFFER,
         new Float32Array(coordinates),
         gl.STATIC_DRAW
     );
 
+    //Create Color Buffer
+    const colors = [
+        1.0,  1.0,  1.0,  1.0,    // white
+        1.0,  0.0,  0.0,  1.0,    // red
+        0.0,  1.0,  0.0,  1.0,    // green
+        0.0,  0.0,  1.0,  1.0,    // blue
+    ];
+    const colorBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+    gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array(colors),
+        gl.STATIC_DRAW
+    );
+
     return {
         position: positionBuffer,
         indices: indexBuffer,
-        textureCoords: texCoordBuffer
+        textureCoords: texCoordBuffer,
+
+        color:colorBuffer
     };
 }
 
