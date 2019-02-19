@@ -13,11 +13,9 @@ let JuliaSampler
 //Functions
 function init(){
     gl = document.querySelector("#glCanvas").getContext("webgl");
-
     if(gl === null){
         alert("WebGL is required to run this app!");
     }
-
     const vertSource = `
         attribute vec4 aVertexPosition;
         attribute vec2 aTexCoord;
@@ -46,30 +44,29 @@ function init(){
         varying lowp vec4 vColor;
 
         void main() {
-            gl_FragColor = vec4(vColor);
+            gl_FragColor = vColor;
             return;
-            const highp int iter = 11000;
-            highp vec2 z;
+            const mediump int itter = 17;
+
+            highp vec2 z = vec2(0.0, 0.0);
             z.x = 3.0 * (textCoord.x - 0.5);
             z.y = 2.0 * (textCoord.y - 0.5);
-
-            gl_FragColor = vec4(gl_FragCoord.y, gl_FragCoord.x, 0.0, 1.0);
-            return;
-
-            highp int final;
-            for(int i = 0; i < iter; i++) {
+            //gl_FragColor = vec4(0.0, 0.0, 1.0, 1.0);
+            mediump int final;
+            for(int i = 0; i < itter; i++) {
                 lowp float x = (z.x * z.x - z.y * z.y) + c.x;
                 lowp float y = (z.y * z.x + z.x * z.y) + c.y;
 
-                if((x * x + y * y) > 4.0) break;
+                if((x * x + y * y) > 4.0) return;
                 z.x = x;
                 z.y = y;
 
                 final = i;
             }
-
-            gl_FragColor = texture2D(textureSampler, vec2((final == iter ? 0.0 : float(final)) / 100.0, 0.5));
-            //gl_FragColor = vec4(textCoord,0.0,1.0);
+            highp float finalf = float(final);
+            //gl_FragColor = texture2D(textureSampler, vec2((final == itter ? 0.0 : finalf) / 100.0, 0.5));
+            gl_FragColor = vec4(finalf / 50.0, 0.0, 0.0, 1.0);
+            //gl_FragColor = vec4(final / 100.0, 0.0, 0.0, 1.0);
         }`;
 //https://stackoverflow.com/questions/17537879/in-webgl-what-are-the-differences-between-an-attribute-a-uniform-and-a-varying
 //https://stackoverflow.com/questions/11216912/webgl-shader-errors
@@ -240,8 +237,8 @@ function draw(){
     //Send Seed to Pixel Shader
     {
         const seed = vec2.create();
-        vec2.x = 50;
-        vec2.y = 999;
+        vec2.x = .823459623;
+        vec2.y = .125095467;
         gl.uniformMatrix4fv(
             JuliaShader.uniformLocations.modelViewMatrix,
             false, 
