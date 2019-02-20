@@ -11,10 +11,8 @@ let JuliaShader;
 let JuliaSampler;
 
 //Variables
-let jSeedAInitial = .823459623;
-let jSeedBInitial = .21095467;
-let jSeedA = jSeedAInitial;
-let jSeedB = jSeedBInitial;
+let jSeedA = .723459623;
+let jSeedB = .21095467;
 let startTime;
 let time;
 let deltaTime;
@@ -52,7 +50,6 @@ function init(){
         varying highp vec2 textCoord;
         varying lowp vec4 vColor;
 
-
         void main() {
             const mediump int itter = 200;
 
@@ -75,7 +72,6 @@ function init(){
             }
             highp float finalf = float(final);
             gl_FragColor = vec4(finalf / 50.0, 0.0, 0.0, 1.0);
-                gl_FragColor += vec4(0.0, 0.25, 0.25, 1.0);
             //gl_FragColor = texture2D(textureSampler, vec2((final == itter ? 0.0 : finalf) / 200.0, 0.5));
             //gl_FragColor = texture2D(textureSampler, vec2(finalf / 400.0, 0.5));
         }`;
@@ -144,8 +140,8 @@ function update(){
     timeUpdate();
     draw();
 
-    //jSeedA += Math.sin(time / 1000.0) / 750;
-    jSeedB = jSeedBInitial * (Math.sin(time / 1000.0) / 1.15);
+    jSeedA += Math.sin(time / 1000.0) / 1000;
+    jSeedB += Math.cos(time / 1000.0) / 1000;
 
     requestAnimationFrame(update);
 }
