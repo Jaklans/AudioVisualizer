@@ -8,6 +8,7 @@ let buffers;
 let JuliaShader;
 
 //Assets
+let renderObjects = [];
 let JuliaSampler;
 
 //Variables
@@ -25,66 +26,8 @@ function init(){
     if(gl === null){
         alert("WebGL is required to run this app!");
     }
-    const vertSource = `
-        attribute vec4 aVertexPosition;
-        attribute vec2 aTexCoord;
-        attribute vec4 aVertexColor;
-
-        uniform highp mat4 uModelViewMatrix;
-        uniform highp mat4 uProjectionMatrix;
-
-        varying highp vec2 textCoord;
-        varying lowp vec4 vColor;
-
-        void main() {
-            textCoord = vec2(aTexCoord);
-            vColor = aVertexColor;
-            gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
-        }`;
-    const fragSource = `
-        void main() {
-            gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
-        }`;
-    const fragJuliaSource = `
-        uniform sampler2D textureSampler;
-        uniform highp vec2 uSeed;
-
-        varying highp vec2 textCoord;
-        varying lowp vec4 vColor;
-
-
-        void main() {
-            const mediump int itter = 200;
-
-            highp vec2 z = vec2(0.0, 0.0);
-            z.x = 3.0 * (textCoord.x - 0.5);
-            z.y = 2.0 * (textCoord.y - 0.5);
-            
-            mediump int final;
-            for(int i = 0; i < itter; i++) {
-                lowp float x = (z.x * z.x - z.y * z.y) - uSeed.x;
-                lowp float y = (z.y * z.x + z.x * z.y) - uSeed.y;
-
-                if((x * x + y * y) > 4.0) {
-                    final = i;
-                    break;
-                }
-
-                z.x = x;
-                z.y = y;
-            }
-            highp float finalf = float(final);
-            gl_FragColor = vec4(finalf / 50.0, 0.0, 0.0, 1.0);
-                gl_FragColor += vec4(0.0, 0.25, 0.25, 1.0);
-            //gl_FragColor = texture2D(textureSampler, vec2((final == itter ? 0.0 : finalf) / 200.0, 0.5));
-            //gl_FragColor = texture2D(textureSampler, vec2(finalf / 400.0, 0.5));
-        }`;
-//https://stackoverflow.com/questions/17537879/in-webgl-what-are-the-differences-between-an-attribute-a-uniform-and-a-varying
-//https://stackoverflow.com/questions/11216912/webgl-shader-errors
-//http://nuclear.mutantstargoat.com/articles/sdr_fract/
-//https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial/Using_shaders_to_apply_color_in_WebGL
-//https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial/Using_textures_in_WebGL
-    const shaderProgram = initShaders(gl, vertSource, fragJuliaSource);
+    
+    const shaderProgram = createShaderProgram(gl, vertSource, fragJuliaSource);
     
     JuliaShader = {
         program: shaderProgram,
@@ -135,7 +78,26 @@ function init(){
 
     startTime = new Date();
 
+    initInputs();
+
     update();
+}
+function initInputs(){
+    getElement("#aInitial").oninput = function(){
+        jSeedAInitial = this.value;
+    }
+    getElement("#bInitial").oninput = function(){
+        jSeedBInitial = this.value;
+    }
+    getElement("#aMod").oninput = function(){
+        jSeedAInitial = this.value;
+    }
+    getElement("#bMod").oninput = function(){
+        jSeedAInitial = this.value;
+    }
+}
+function initRenderObjects(){
+    
 }
 
 //Update Functions--------------------------------------
@@ -145,7 +107,8 @@ function update(){
     draw();
 
     //jSeedA += Math.sin(time / 1000.0) / 750;
-    jSeedB = jSeedBInitial * (Math.sin(time / 1000.0) / 1.15);
+    jSeedA = jSeedAInitial;//    + Math.sin(time / 10000) / 2;
+    jSeedB = 1 - jSeedA;// * (Math.sin(time / 1000.0) / 1.15);
 
     requestAnimationFrame(update);
 }
@@ -279,7 +242,7 @@ function draw(){
 }
 
 //WebGL Initialization Functions-------------------------
-function initShaders(gl, vertexSource, fragmentSource){
+function createShaderProgram(gl, vertexSource, fragmentSource){
     let vert = loadShader(gl, gl.VERTEX_SHADER, vertexSource);
     let frag = loadShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
 
@@ -376,5 +339,68 @@ function initBuffers(gl) {
         color:colorBuffer
     };
 }
+
+//Helper Functions---------------------------------------
+function getElement(elementID){
+    return document.querySelector(elementID);
+}
+
+const vertSource = `
+        attribute vec4 aVertexPosition;
+        attribute vec2 aTexCoord;
+        attribute vec4 aVertexColor;
+
+        uniform highp mat4 uModelViewMatrix;
+        uniform highp mat4 uProjectionMatrix;
+
+        varying highp vec2 textCoord;
+        varying lowp vec4 vColor;
+
+        void main() {
+            textCoord = vec2(aTexCoord);
+            vColor = aVertexColor;
+            gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
+        }`;
+    const fragSource = `
+        void main() {
+            gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+        }`;
+    const fragJuliaSource = `
+        uniform sampler2D textureSampler;
+        uniform highp vec2 uSeed;
+
+        varying highp vec2 textCoord;
+        varying lowp vec4 vColor;
+
+
+        void main() {
+            const mediump int itter = 200;
+
+            highp vec2 z = vec2(0.0, 0.0);
+            z.x = 3.0 * (textCoord.x - 0.5);
+            z.y = 2.0 * (textCoord.y - 0.5);
+            
+            mediump int final;
+            for(int i = 0; i < itter; i++) {
+                lowp float x = (z.x * z.x - z.y * z.y) - uSeed.x;
+                lowp float y = (z.y * z.x + z.x * z.y) - uSeed.y;
+
+                if((x * x + y * y) > 4.0) {
+                    final = i;
+                    break;
+                }
+
+                z.x = x;
+                z.y = y;
+            }
+            highp float finalf = float(final);
+            gl_FragColor = vec4(finalf / 50.0, 0.0, 0.0, 1.0);
+            //gl_FragColor += vec4(0.0, 0.25, 0.25, 1.0);
+        }`;
+//https://stackoverflow.com/questions/17537879/in-webgl-what-are-the-differences-between-an-attribute-a-uniform-and-a-varying
+//https://stackoverflow.com/questions/11216912/webgl-shader-errors
+//http://nuclear.mutantstargoat.com/articles/sdr_fract/
+//https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial/Using_shaders_to_apply_color_in_WebGL
+//https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial/Using_textures_in_WebGL
 
 window.onload = init;
