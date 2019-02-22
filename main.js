@@ -7,6 +7,7 @@ let buffers;
 
 //Shaders
 let JuliaShader;
+let defaultShader;
 
 //Assets
 let renderObjects = [];
@@ -22,26 +23,39 @@ let time;
 let deltaTime;
 
 //Functions
-function init(){
+function init() {
     gl = document.querySelector("#glCanvas").getContext("webgl");
-    if(gl === null){
+    if (gl === null) {
         alert("WebGL is required to run this app!");
     }
-    
-    const shaderProgram = createShaderProgram(gl, vertSource, fragJuliaSource);
-    
+
+    const JuliaShaderProgram = createShaderProgram(gl, vertJuliaSource, fragJuliaSource);
+
     JuliaShader = {
-        program: shaderProgram,
+        program: JuliaShaderProgram,
         attribLocations: {
-            vertexPosition: gl.getAttribLocation(shaderProgram, "aVertexPosition"),
-            textureCoord: gl.getAttribLocation(shaderProgram, 'aTexCoord'),
-            vertexColor: gl.getAttribLocation(shaderProgram, "aVertexColor")
+            vertexPosition: gl.getAttribLocation(JuliaShaderProgram, "aVertexPosition"),
+            textureCoord: gl.getAttribLocation(JuliaShaderProgram, 'aTexCoord'),
+            vertexColor: gl.getAttribLocation(JuliaShaderProgram, "aVertexColor")
         },
         uniformLocations: {
-            projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
-            modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
-            textureSampler: gl.getUniformLocation(shaderProgram, 'textureSampler'),
-            seed: gl.getUniformLocation(shaderProgram, 'uSeed')
+            projectionMatrix: gl.getUniformLocation(JuliaShaderProgram, 'uProjectionMatrix'),
+            modelViewMatrix: gl.getUniformLocation(JuliaShaderProgram, 'uModelViewMatrix'),
+            textureSampler: gl.getUniformLocation(JuliaShaderProgram, 'textureSampler'),
+            seed: gl.getUniformLocation(JuliaShaderProgram, 'uSeed')
+        },
+    };
+
+    const defaultShaderProgram = createShaderProgram(gl, vertDefaultSource, fragDefaultSource);
+
+    defaultShader = {
+        program: defaultShaderProgram,
+        attribLocations: {
+            vertexPosition: gl.getAttribLocation(defaultShaderProgram, "aVertexPosition")
+        },
+        uniformLocations: {
+            projectionMatrix: gl.getUniformLocation(defaultShaderProgram, 'uProjectionMatrix'),
+            modelViewMatrix: gl.getUniformLocation(defaultShaderProgram, 'uModelViewMatrix'),
         },
     };
 
@@ -65,11 +79,11 @@ function init(){
         gl.texImage2D(
             gl.TEXTURE_2D,
             level,
-            internalFormat, 
-            width, height, 
+            internalFormat,
+            width, height,
             border,
             srcFormat,
-            srcType, 
+            srcType,
             values);
         gl.activeTexture(gl.TEXTURE0);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -83,27 +97,27 @@ function init(){
 
     update();
 }
-function initInputs(){
-    getElement("#aInitial").oninput = function(){
+function initInputs() {
+    getElement("#aInitial").oninput = function () {
         jSeedAInitial = this.value;
     }
-    getElement("#bInitial").oninput = function(){
+    getElement("#bInitial").oninput = function () {
         jSeedBInitial = this.value;
     }
-    getElement("#aMod").oninput = function(){
+    getElement("#aMod").oninput = function () {
         jSeedAInitial = this.value;
     }
-    getElement("#bMod").oninput = function(){
+    getElement("#bMod").oninput = function () {
         jSeedAInitial = this.value;
     }
 }
-function initRenderObjects(){
-    
+function initRenderObjects() {
+
 }
 
 //Update Functions--------------------------------------
-    //Call all update functions
-function update(){
+//Call all update functions
+function update() {
     timeUpdate();
     draw();
 
@@ -115,14 +129,14 @@ function update(){
 
     requestAnimationFrame(update);
 }
-    //Update variables that keep track of time
-function timeUpdate(){
+//Update variables that keep track of time
+function timeUpdate() {
     let currentTime = new Date();
     deltaTime = currentTime - time;
     time = currentTime - startTime;
 }
-    //Render the current scene
-function draw(){
+//Render the current scene
+function draw() {
     gl.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
     gl.clearDepth(1.0);                 // Clear everything
     gl.enable(gl.DEPTH_TEST);           // Enable depth testing
@@ -143,7 +157,7 @@ function draw(){
         zNear,
         zFar
     );
-    mat4.translate(projectionMatrix, projectionMatrix, [0,0, -3.25]);
+    mat4.translate(projectionMatrix, projectionMatrix, [0, 0, -3.25]);
 
     gl.useProgram(JuliaShader.program);
     //Attributes--------------------------------------------------------------
@@ -176,11 +190,11 @@ function draw(){
         const offset = 0;
 
         gl.bindBuffer(gl.ARRAY_BUFFER, buffers.textureCoords);
-        gl.vertexAttribPointer(JuliaShader.attribLocations.textureCoord, 
-            numComponents, 
-            type, 
-            normalize, 
-            stride, 
+        gl.vertexAttribPointer(JuliaShader.attribLocations.textureCoord,
+            numComponents,
+            type,
+            normalize,
+            stride,
             offset);
         gl.enableVertexAttribArray(JuliaShader.attribLocations.textureCoord);
     }
@@ -201,12 +215,12 @@ function draw(){
             offset);
         gl.enableVertexAttribArray(
             JuliaShader.attribLocations.vertexColor);
-      }
+    }
     //Uniforms-----------------------------------------------------------------
     //Send Projection Matrix to Vertex Shader
     gl.uniformMatrix4fv(
         JuliaShader.uniformLocations.projectionMatrix,
-        false, 
+        false,
         projectionMatrix
     );
     //Send Texture Sampler to Pixel Shader
@@ -223,31 +237,89 @@ function draw(){
     );
 
     //Draw Calls
-    for(let i = 0; i < 4; i++)
-    {
+    for (let i = 0; i < 4; i++) {
         const modelViewMatrix = mat4.create();
         //mat4.scale(modelViewMatrix, modelViewMatrix, [.5, .5, .5]);
-        
-        mat4.rotate(modelViewMatrix, modelViewMatrix, (Math.PI / 4) * (1 + 2 * (i + 1)), [0, 0, -1]);
-        mat4.translate(modelViewMatrix, modelViewMatrix, [0, 1 , 0]);
-        mat4.rotate(modelViewMatrix, modelViewMatrix, time / 4000, [0, -1, 0]);
+
+        mat4.rotate(modelViewMatrix, modelViewMatrix, -(Math.PI / 4) * (1 + 2 * (i + 1)), [0, 0, -1]);
+        mat4.translate(modelViewMatrix, modelViewMatrix, [1, 0, 0]);
+        mat4.rotate(modelViewMatrix, modelViewMatrix, time / 4000, [0, -1, 0]); mat4.rotate(modelViewMatrix, modelViewMatrix, Math.PI / 2, [1, 0, 0]);
 
         //Send ModelView Matrix to Vertex Shader
         gl.uniformMatrix4fv(
             JuliaShader.uniformLocations.modelViewMatrix,
-            false, 
+            false,
             modelViewMatrix
         );
         const indexCount = 24;
         const type = gl.UNSIGNED_SHORT;
         const offset = 0;
-        gl.drawElements(gl.TRIANGLES,indexCount,type,offset);
+        gl.drawElements(gl.TRIANGLES, indexCount, type, offset);
     }
+    {
+        const modelViewMatrix = mat4.create();
+        mat4.scale(modelViewMatrix, modelViewMatrix, [.5, .5, .5]);
+        mat4.rotate(modelViewMatrix, modelViewMatrix, Math.PI / 2, [1, 0, 0]);
 
+        //Send ModelView Matrix to Vertex Shader
+        gl.uniformMatrix4fv(
+            JuliaShader.uniformLocations.modelViewMatrix,
+            false,
+            modelViewMatrix
+        );
+        const indexCount = 24;
+        const type = gl.UNSIGNED_SHORT;
+        const offset = 0;
+        gl.drawElements(gl.TRIANGLES, indexCount, type, offset);
+    }
+    /*{
+        gl.useProgram(defaultShader.program);
+        const modelViewMatrix = mat4.create();
+        mat4.translate(modelViewMatrix, modelViewMatrix, [0, 0, .5]);
+        mat4.scale(modelViewMatrix, modelViewMatrix, [.125, .125, .125]);
+        //mat4.rotate(modelViewMatrix, modelViewMatrix, Math.PI / 2, [1, 0, 0]);
+        mat4.rotate(modelViewMatrix, modelViewMatrix, time / 4000, [0, -1, 0]); mat4.rotate(modelViewMatrix, modelViewMatrix, Math.PI / 2, [0, 1, 0]);
+        //Send Vertex Buffer to Vertex Shader
+        {
+            const numComponents = 3;
+            const type = gl.FLOAT;
+            const normalize = false;
+            const stride = 0;
+            const offset = 0;
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.indices);
+            gl.vertexAttribPointer(
+                defaultShader.attribLocations.vertexPosition,
+                numComponents,
+                type,
+                normalize,
+                stride,
+                offset
+            );
+            gl.enableVertexAttribArray(defaultShader.attribLocations.vertexPosition);
+        }
+        //Send Projection Matrix to Vertex Shader
+        gl.uniformMatrix4fv(
+            defaultShader.uniformLocations.projectionMatrix,
+            false,
+            projectionMatrix
+        );
+        //Send ModelView Matrix to Vertex Shader
+        gl.uniformMatrix4fv(
+            defaultShader.uniformLocations.modelViewMatrix,
+            false,
+            modelViewMatrix
+        );
+        const indexCount = 24;
+        const type = gl.UNSIGNED_SHORT;
+        const offset = 0;
+        gl.drawElements(gl.TRIANGLES, indexCount, type, offset);
+    }*/
 }
 
 //WebGL Initialization Functions-------------------------
-function createShaderProgram(gl, vertexSource, fragmentSource){
+function createShaderProgram(gl, vertexSource, fragmentSource) {
     let vert = loadShader(gl, gl.VERTEX_SHADER, vertexSource);
     let frag = loadShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
 
@@ -256,20 +328,20 @@ function createShaderProgram(gl, vertexSource, fragmentSource){
     gl.attachShader(shaderProgram, frag);
     gl.linkProgram(shaderProgram);
 
-    if(!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)){
-        alert("Shader initialization failed: " +  + gl.getProgramInfoLog(shaderProgram));
+    if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+        alert("Shader initialization failed: " + + gl.getProgramInfoLog(shaderProgram));
     }
 
     return shaderProgram;
 }
-function loadShader(gl, type, source){
+function loadShader(gl, type, source) {
     const shader = gl.createShader(type);
 
     gl.shaderSource(shader, source);
 
     gl.compileShader(shader);
 
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)){
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
         alert("A shader failed to compile: " + gl.getShaderInfoLog(shader));
         gl.deleteShader(shader);
         return null;
@@ -280,12 +352,12 @@ function loadShader(gl, type, source){
 function initBuffers(gl) {
     //Create Position Buffer
     const positions = [
-         0.0, -1.0, 0.0, //TipA
-         0.0,  1.0, 0.0, //TipB
-        -1.0,  0.0, 0.0, //2
-         0.0,  0.0, 1.0, //3
-         1.0,  0.0, 0.0, //4
-         0.0,  0.0,-1.0  //5
+        0.0, -1.0, 0.0, //TipA
+        0.0, 1.0, 0.0, //TipB
+        -1.0, 0.0, 0.0, //2
+        0.0, 0.0, 1.0, //3
+        1.0, 0.0, 0.0, //4
+        0.0, 0.0, -1.0  //5
     ];
     const positionBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
@@ -303,7 +375,7 @@ function initBuffers(gl) {
         1, 4, 3,
         0, 4, 5,
         1, 5, 4,
-        0, 5, 2, 
+        0, 5, 2,
         1, 2, 5
     ];
     const indexBuffer = gl.createBuffer();
@@ -333,12 +405,12 @@ function initBuffers(gl) {
 
     //Create Color Buffer
     const colors = [
-        1.0,  1.0,  1.0,  1.0,    // white
-        1.0,  1.0,  1.0,  1.0,    // white
-        1.00, .827, 0,  1.0,    // red
-        .243, .008, 1.00,  1.0,    // blue
-        1.0,  0.0,  0.0,  1.0,    // white
-        0.0,  1.0,  0.0,  1.0,    // red
+        1.0, 1.0, 1.0, 1.0,    // white
+        1.0, 1.0, 1.0, 1.0,    // white
+        1.00, .827, 0, 1.0,    // red
+        .243, .008, 1.00, 1.0,    // blue
+        1.0, 0.0, 0.0, 1.0,    // white
+        0.0, 1.0, 0.0, 1.0,    // red
     ];
     const colorBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
@@ -353,16 +425,25 @@ function initBuffers(gl) {
         indices: indexBuffer,
         textureCoords: texCoordBuffer,
 
-        color:colorBuffer
+        color: colorBuffer
     };
 }
 
 //Helper Functions---------------------------------------
-function getElement(elementID){
+function getElement(elementID) {
     return document.querySelector(elementID);
 }
 
-const vertSource = `
+const vertDefaultSource = `
+        attribute vec4 aVertexPosition;
+
+        uniform highp mat4 uModelViewMatrix;
+        uniform highp mat4 uProjectionMatrix;
+
+        void main() {
+            gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
+        }`;
+const vertJuliaSource = `
         attribute vec4 aVertexPosition;
         attribute vec2 aTexCoord;
         attribute vec4 aVertexColor;
@@ -378,11 +459,11 @@ const vertSource = `
             vColor = aVertexColor;
             gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
         }`;
-    const fragSource = `
+const fragDefaultSource = `
         void main() {
-            gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+            gl_FragColor = vec4(0.1, 0.1, 0.1, 1.0);
         }`;
-    const fragJuliaSource = `
+const fragJuliaSource = `
         uniform sampler2D textureSampler;
         uniform highp vec2 uSeed;
 
@@ -411,7 +492,7 @@ const vertSource = `
                 z.y = y;
             }
             highp float finalf = float(final);
-            gl_FragColor = vColor * (finalf / 50.0);
+            gl_FragColor = vColor * (finalf / 50.0) * 1.25;
             gl_FragColor.w = 1.0;
         }`;
 //https://stackoverflow.com/questions/17537879/in-webgl-what-are-the-differences-between-an-attribute-a-uniform-and-a-varying
