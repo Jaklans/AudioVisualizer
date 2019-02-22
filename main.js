@@ -1,3 +1,4 @@
+//import {JuliaSource} from "./Shaders/julia.frag.js";
 "use strict"
 
 //WebGL Environment
@@ -12,7 +13,7 @@ let renderObjects = [];
 let JuliaSampler;
 
 //Variables
-let jSeedAInitial = .823459623;
+let jSeedAInitial = .723459623;
 let jSeedBInitial = .21095467;
 let jSeedA = jSeedAInitial;
 let jSeedB = jSeedBInitial;
@@ -107,8 +108,10 @@ function update(){
     draw();
 
     //jSeedA += Math.sin(time / 1000.0) / 750;
-    jSeedA = jSeedAInitial;//    + Math.sin(time / 10000) / 2;
-    jSeedB = 1 - jSeedA;// * (Math.sin(time / 1000.0) / 1.15);
+    //jSeedA = jSeedAInitial * Math.sin(time / 10000) / 2;
+    //jSeedB = jSeedBInitial * Math.sin(time / 1000.0 + 1520) / 1.15;
+    jSeedA += Math.sin(time / 1000.0) / 500;
+    jSeedB -= Math.cos(time / 5000.0) / 2000;
 
     requestAnimationFrame(update);
 }
@@ -140,18 +143,13 @@ function draw(){
         zNear,
         zFar
     );
-    const modelViewMatrix = mat4.create();
-    mat4.translate(
-        modelViewMatrix, // Destination
-        modelViewMatrix, // Source
-        [0.0,0.0,-2.0]
-    );
+    mat4.translate(projectionMatrix, projectionMatrix, [0,0, -3.25]);
 
     gl.useProgram(JuliaShader.program);
     //Attributes--------------------------------------------------------------
     //Send Vertex Buffer to Vertex Shader
     {
-        const numComponents = 2;
+        const numComponents = 3;
         const type = gl.FLOAT;
         const normalize = false;
         const stride = 0;
@@ -211,13 +209,6 @@ function draw(){
         false, 
         projectionMatrix
     );
-    //Send ModelView Matrix to Vertex Shader
-    //Send Seed to Pixel Shader
-    gl.uniformMatrix4fv(
-        JuliaShader.uniformLocations.modelViewMatrix,
-        false, 
-        modelViewMatrix
-    );
     //Send Texture Sampler to Pixel Shader
     {
         gl.activeTexture(gl.TEXTURE0);
@@ -231,9 +222,23 @@ function draw(){
         jSeedB
     );
 
-    //Draw Call
+    //Draw Calls
+    for(let i = 0; i < 4; i++)
     {
-        const indexCount = 6;
+        const modelViewMatrix = mat4.create();
+        //mat4.scale(modelViewMatrix, modelViewMatrix, [.5, .5, .5]);
+        
+        mat4.rotate(modelViewMatrix, modelViewMatrix, (Math.PI / 4) * (1 + 2 * (i + 1)), [0, 0, -1]);
+        mat4.translate(modelViewMatrix, modelViewMatrix, [0, 1 , 0]);
+        mat4.rotate(modelViewMatrix, modelViewMatrix, time / 4000, [0, -1, 0]);
+
+        //Send ModelView Matrix to Vertex Shader
+        gl.uniformMatrix4fv(
+            JuliaShader.uniformLocations.modelViewMatrix,
+            false, 
+            modelViewMatrix
+        );
+        const indexCount = 24;
         const type = gl.UNSIGNED_SHORT;
         const offset = 0;
         gl.drawElements(gl.TRIANGLES,indexCount,type,offset);
@@ -275,10 +280,12 @@ function loadShader(gl, type, source){
 function initBuffers(gl) {
     //Create Position Buffer
     const positions = [
-        -1.0,  1.0,
-         1.0,  1.0,
-        -1.0, -1.0,
-         1.0, -1.0
+         0.0, -1.0, 0.0, //TipA
+         0.0,  1.0, 0.0, //TipB
+        -1.0,  0.0, 0.0, //2
+         0.0,  0.0, 1.0, //3
+         1.0,  0.0, 0.0, //4
+         0.0,  0.0,-1.0  //5
     ];
     const positionBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
@@ -290,8 +297,14 @@ function initBuffers(gl) {
 
     //Create Index Buffer
     const indices = [
-        0, 1, 2,
-        1, 2, 3
+        0, 2, 3,
+        1, 3, 2,
+        0, 3, 4,
+        1, 4, 3,
+        0, 4, 5,
+        1, 5, 4,
+        0, 5, 2, 
+        1, 2, 5
     ];
     const indexBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
@@ -306,6 +319,8 @@ function initBuffers(gl) {
         0.0, 0.0,
         1.0, 0.0,
         0.0, 1.0,
+        1.0, 1.0,
+        0.0, 1.0,
         1.0, 1.0
     ];
     const texCoordBuffer = gl.createBuffer();
@@ -319,9 +334,11 @@ function initBuffers(gl) {
     //Create Color Buffer
     const colors = [
         1.0,  1.0,  1.0,  1.0,    // white
-        1.0,  0.0,  0.0,  1.0,    // red
-        0.0,  1.0,  0.0,  1.0,    // green
-        0.0,  0.0,  1.0,  1.0,    // blue
+        1.0,  1.0,  1.0,  1.0,    // white
+        1.00, .827, 0,  1.0,    // red
+        .243, .008, 1.00,  1.0,    // blue
+        1.0,  0.0,  0.0,  1.0,    // white
+        0.0,  1.0,  0.0,  1.0,    // red
     ];
     const colorBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
@@ -394,8 +411,8 @@ const vertSource = `
                 z.y = y;
             }
             highp float finalf = float(final);
-            gl_FragColor = vec4(finalf / 50.0, 0.0, 0.0, 1.0);
-            //gl_FragColor += vec4(0.0, 0.25, 0.25, 1.0);
+            gl_FragColor = vColor * (finalf / 50.0);
+            gl_FragColor.w = 1.0;
         }`;
 //https://stackoverflow.com/questions/17537879/in-webgl-what-are-the-differences-between-an-attribute-a-uniform-and-a-varying
 //https://stackoverflow.com/questions/11216912/webgl-shader-errors

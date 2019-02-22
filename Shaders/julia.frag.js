@@ -1,3 +1,5 @@
+export { JuliaSource };
+
 const JuliaFragSouce =  `
 uniform sampler2D textureSampler;
 uniform highp vec2 uSeed;
@@ -31,5 +33,4 @@ void main() {
     //gl_FragColor += vec4(0.0, 0.25, 0.25, 1.0);
 }`;
 
-function JuliaSource() { return JuliaFragSouce }
-export { JuliaSource };
+function JuliaSource() { return JuliaFragSouce };
