@@ -1,4 +1,7 @@
-//import {JuliaSource} from "./Shaders/julia.frag.js";
+import { JuliaFragSouce } from "./Shaders/julia.frag.js";
+import { JuliaVertSouce } from "./Shaders/julia.vert.js";
+import { CreateShaderProgram, InitBuffers } from "./webGLInit.js";
+import { AnalyserInit, AnalyserUpdate, audioData, TogglePlayback } from "./audioAnalysis.js";
 "use strict"
 
 //WebGL Environment
@@ -7,15 +10,10 @@ let buffers;
 
 //Shaders
 let JuliaShader;
-let defaultShader;
-
-//Assets
-let renderObjects = [];
-let JuliaSampler;
 
 //Variables
-let jSeedAInitial = .723459623;
-let jSeedBInitial = .21095467;
+let jSeedAInitial = .5;
+let jSeedBInitial = .6;
 let jSeedA = jSeedAInitial;
 let jSeedB = jSeedBInitial;
 let startTime;
@@ -29,7 +27,9 @@ function init() {
         alert("WebGL is required to run this app!");
     }
 
-    const JuliaShaderProgram = createShaderProgram(gl, vertJuliaSource, fragJuliaSource);
+    AnalyserInit();
+
+    const JuliaShaderProgram = CreateShaderProgram(gl, JuliaVertSouce, JuliaFragSouce);
 
     JuliaShader = {
         program: JuliaShaderProgram,
@@ -41,56 +41,11 @@ function init() {
         uniformLocations: {
             projectionMatrix: gl.getUniformLocation(JuliaShaderProgram, 'uProjectionMatrix'),
             modelViewMatrix: gl.getUniformLocation(JuliaShaderProgram, 'uModelViewMatrix'),
-            textureSampler: gl.getUniformLocation(JuliaShaderProgram, 'textureSampler'),
             seed: gl.getUniformLocation(JuliaShaderProgram, 'uSeed')
         },
     };
 
-    const defaultShaderProgram = createShaderProgram(gl, vertDefaultSource, fragDefaultSource);
-
-    defaultShader = {
-        program: defaultShaderProgram,
-        attribLocations: {
-            vertexPosition: gl.getAttribLocation(defaultShaderProgram, "aVertexPosition")
-        },
-        uniformLocations: {
-            projectionMatrix: gl.getUniformLocation(defaultShaderProgram, 'uProjectionMatrix'),
-            modelViewMatrix: gl.getUniformLocation(defaultShaderProgram, 'uModelViewMatrix'),
-        },
-    };
-
-    buffers = initBuffers(gl);
-
-    //Create Texture for Julia Fractal
-    {
-        JuliaSampler = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, JuliaSampler);
-        const level = 0;
-        const internalFormat = gl.RGBA;
-        const width = 2;
-        const height = 1;
-        const border = 0;
-        const srcFormat = gl.RGBA;
-        const srcType = gl.UNSIGNED_BYTE;
-        const values = new Uint8Array([
-            255, 0, 0, 255,
-            0, 255, 0, 255
-        ]);
-        gl.texImage2D(
-            gl.TEXTURE_2D,
-            level,
-            internalFormat,
-            width, height,
-            border,
-            srcFormat,
-            srcType,
-            values);
-        gl.activeTexture(gl.TEXTURE0);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    }
-
+    buffers = InitBuffers(gl);
     startTime = new Date();
 
     initInputs();
@@ -110,22 +65,24 @@ function initInputs() {
     getElement("#bMod").oninput = function () {
         jSeedAInitial = this.value;
     }
-}
-function initRenderObjects() {
-
+    getElement("#play").onclick = function () { TogglePlayback(); };
 }
 
 //Update Functions--------------------------------------
 //Call all update functions
 function update() {
+    AnalyserUpdate();
     timeUpdate();
     draw();
+
+    let audioDataSum = 0;
+    audioData.forEach(function (element) {audioDataSum += element});
 
     //jSeedA += Math.sin(time / 1000.0) / 750;
     //jSeedA = jSeedAInitial * Math.sin(time / 10000) / 2;
     //jSeedB = jSeedBInitial * Math.sin(time / 1000.0 + 1520) / 1.15;
-    jSeedA += Math.sin(time / 1000.0) / 500;
-    jSeedB -= Math.cos(time / 5000.0) / 2000;
+    jSeedA = jSeedAInitial + Math.sin(time / 1000.0) / 50;
+    jSeedB = jSeedBInitial + Math.sin(audioDataSum / 500) / 500;
 
     requestAnimationFrame(update);
 }
@@ -223,12 +180,6 @@ function draw() {
         false,
         projectionMatrix
     );
-    //Send Texture Sampler to Pixel Shader
-    {
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, JuliaSampler);
-        gl.uniform1i(JuliaShader.uniformLocations.textureSampler, 0);
-    }
     //Send Seed to Pixel Shader
     gl.uniform2f(
         JuliaShader.uniformLocations.seed,
@@ -239,8 +190,6 @@ function draw() {
     //Draw Calls
     for (let i = 0; i < 4; i++) {
         const modelViewMatrix = mat4.create();
-        //mat4.scale(modelViewMatrix, modelViewMatrix, [.5, .5, .5]);
-
         mat4.rotate(modelViewMatrix, modelViewMatrix, -(Math.PI / 4) * (1 + 2 * (i + 1)), [0, 0, -1]);
         mat4.translate(modelViewMatrix, modelViewMatrix, [1, 0, 0]);
         mat4.rotate(modelViewMatrix, modelViewMatrix, time / 4000, [0, -1, 0]); mat4.rotate(modelViewMatrix, modelViewMatrix, Math.PI / 2, [1, 0, 0]);
@@ -272,161 +221,6 @@ function draw() {
         const offset = 0;
         gl.drawElements(gl.TRIANGLES, indexCount, type, offset);
     }
-    /*{
-        gl.useProgram(defaultShader.program);
-        const modelViewMatrix = mat4.create();
-        mat4.translate(modelViewMatrix, modelViewMatrix, [0, 0, .5]);
-        mat4.scale(modelViewMatrix, modelViewMatrix, [.125, .125, .125]);
-        //mat4.rotate(modelViewMatrix, modelViewMatrix, Math.PI / 2, [1, 0, 0]);
-        mat4.rotate(modelViewMatrix, modelViewMatrix, time / 4000, [0, -1, 0]); mat4.rotate(modelViewMatrix, modelViewMatrix, Math.PI / 2, [0, 1, 0]);
-        //Send Vertex Buffer to Vertex Shader
-        {
-            const numComponents = 3;
-            const type = gl.FLOAT;
-            const normalize = false;
-            const stride = 0;
-            const offset = 0;
-
-            gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.indices);
-            gl.vertexAttribPointer(
-                defaultShader.attribLocations.vertexPosition,
-                numComponents,
-                type,
-                normalize,
-                stride,
-                offset
-            );
-            gl.enableVertexAttribArray(defaultShader.attribLocations.vertexPosition);
-        }
-        //Send Projection Matrix to Vertex Shader
-        gl.uniformMatrix4fv(
-            defaultShader.uniformLocations.projectionMatrix,
-            false,
-            projectionMatrix
-        );
-        //Send ModelView Matrix to Vertex Shader
-        gl.uniformMatrix4fv(
-            defaultShader.uniformLocations.modelViewMatrix,
-            false,
-            modelViewMatrix
-        );
-        const indexCount = 24;
-        const type = gl.UNSIGNED_SHORT;
-        const offset = 0;
-        gl.drawElements(gl.TRIANGLES, indexCount, type, offset);
-    }*/
-}
-
-//WebGL Initialization Functions-------------------------
-function createShaderProgram(gl, vertexSource, fragmentSource) {
-    let vert = loadShader(gl, gl.VERTEX_SHADER, vertexSource);
-    let frag = loadShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
-
-    const shaderProgram = gl.createProgram();
-    gl.attachShader(shaderProgram, vert);
-    gl.attachShader(shaderProgram, frag);
-    gl.linkProgram(shaderProgram);
-
-    if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
-        alert("Shader initialization failed: " + + gl.getProgramInfoLog(shaderProgram));
-    }
-
-    return shaderProgram;
-}
-function loadShader(gl, type, source) {
-    const shader = gl.createShader(type);
-
-    gl.shaderSource(shader, source);
-
-    gl.compileShader(shader);
-
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        alert("A shader failed to compile: " + gl.getShaderInfoLog(shader));
-        gl.deleteShader(shader);
-        return null;
-    }
-
-    return shader;
-}
-function initBuffers(gl) {
-    //Create Position Buffer
-    const positions = [
-        0.0, -1.0, 0.0, //TipA
-        0.0, 1.0, 0.0, //TipB
-        -1.0, 0.0, 0.0, //2
-        0.0, 0.0, 1.0, //3
-        1.0, 0.0, 0.0, //4
-        0.0, 0.0, -1.0  //5
-    ];
-    const positionBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-    gl.bufferData(
-        gl.ARRAY_BUFFER,
-        new Float32Array(positions),
-        gl.STATIC_DRAW
-    );
-
-    //Create Index Buffer
-    const indices = [
-        0, 2, 3,
-        1, 3, 2,
-        0, 3, 4,
-        1, 4, 3,
-        0, 4, 5,
-        1, 5, 4,
-        0, 5, 2,
-        1, 2, 5
-    ];
-    const indexBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-    gl.bufferData(
-        gl.ELEMENT_ARRAY_BUFFER,
-        new Uint16Array(indices),
-        gl.STATIC_DRAW
-    );
-
-    //Create Texture Coordinate Buffer
-    const coordinates = [
-        0.0, 0.0,
-        1.0, 0.0,
-        0.0, 1.0,
-        1.0, 1.0,
-        0.0, 1.0,
-        1.0, 1.0
-    ];
-    const texCoordBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
-    gl.bufferData(
-        gl.ARRAY_BUFFER,
-        new Float32Array(coordinates),
-        gl.STATIC_DRAW
-    );
-
-    //Create Color Buffer
-    const colors = [
-        1.0, 1.0, 1.0, 1.0,    // white
-        1.0, 1.0, 1.0, 1.0,    // white
-        1.00, .827, 0, 1.0,    // red
-        .243, .008, 1.00, 1.0,    // blue
-        1.0, 0.0, 0.0, 1.0,    // white
-        0.0, 1.0, 0.0, 1.0,    // red
-    ];
-    const colorBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-    gl.bufferData(
-        gl.ARRAY_BUFFER,
-        new Float32Array(colors),
-        gl.STATIC_DRAW
-    );
-
-    return {
-        position: positionBuffer,
-        indices: indexBuffer,
-        textureCoords: texCoordBuffer,
-
-        color: colorBuffer
-    };
 }
 
 //Helper Functions---------------------------------------
@@ -434,71 +228,10 @@ function getElement(elementID) {
     return document.querySelector(elementID);
 }
 
-const vertDefaultSource = `
-        attribute vec4 aVertexPosition;
+window.onload = init;
 
-        uniform highp mat4 uModelViewMatrix;
-        uniform highp mat4 uProjectionMatrix;
-
-        void main() {
-            gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
-        }`;
-const vertJuliaSource = `
-        attribute vec4 aVertexPosition;
-        attribute vec2 aTexCoord;
-        attribute vec4 aVertexColor;
-
-        uniform highp mat4 uModelViewMatrix;
-        uniform highp mat4 uProjectionMatrix;
-
-        varying highp vec2 textCoord;
-        varying lowp vec4 vColor;
-
-        void main() {
-            textCoord = vec2(aTexCoord);
-            vColor = aVertexColor;
-            gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
-        }`;
-const fragDefaultSource = `
-        void main() {
-            gl_FragColor = vec4(0.1, 0.1, 0.1, 1.0);
-        }`;
-const fragJuliaSource = `
-        uniform sampler2D textureSampler;
-        uniform highp vec2 uSeed;
-
-        varying highp vec2 textCoord;
-        varying lowp vec4 vColor;
-
-
-        void main() {
-            const mediump int itter = 200;
-
-            highp vec2 z = vec2(0.0, 0.0);
-            z.x = 3.0 * (textCoord.x - 0.5);
-            z.y = 2.0 * (textCoord.y - 0.5);
-            
-            mediump int final;
-            for(int i = 0; i < itter; i++) {
-                lowp float x = (z.x * z.x - z.y * z.y) - uSeed.x;
-                lowp float y = (z.y * z.x + z.x * z.y) - uSeed.y;
-
-                if((x * x + y * y) > 4.0) {
-                    final = i;
-                    break;
-                }
-
-                z.x = x;
-                z.y = y;
-            }
-            highp float finalf = float(final);
-            gl_FragColor = vColor * (finalf / 50.0) * 1.25;
-            gl_FragColor.w = 1.0;
-        }`;
 //https://stackoverflow.com/questions/17537879/in-webgl-what-are-the-differences-between-an-attribute-a-uniform-and-a-varying
 //https://stackoverflow.com/questions/11216912/webgl-shader-errors
 //http://nuclear.mutantstargoat.com/articles/sdr_fract/
 //https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial/Using_shaders_to_apply_color_in_WebGL
 //https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial/Using_textures_in_WebGL
-
-window.onload = init;
