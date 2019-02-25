@@ -1,7 +1,7 @@
 import { JuliaFragSouce } from "./Shaders/julia.frag.js";
 import { JuliaVertSouce } from "./Shaders/julia.vert.js";
 import { CreateShaderProgram, InitBuffers } from "./webGLInit.js";
-import { AnalyserInit, AnalyserUpdate, audioData, TogglePlayback } from "./audioAnalysis.js";
+import { AnalyserInit, AnalyserUpdate, audioData, TogglePlayback, playback, GetPlaybackTime } from "./audioAnalysis.js";
 "use strict"
 
 //WebGL Environment
@@ -12,13 +12,20 @@ let buffers;
 let JuliaShader;
 
 //Variables
-let jSeedAInitial = .5;
-let jSeedBInitial = .6;
+let jSeedAInitial = .49;
+let jSeedBInitial = .57;
 let jSeedA = jSeedAInitial;
 let jSeedB = jSeedBInitial;
-let startTime;
-let time;
-let deltaTime;
+let startTime = 0;
+let time = 0;
+let deltaTime = 0;
+let rotation = 0;
+let translation = 0;
+let multiplyer = 0;
+let previousAudioDataSum = 0;
+
+//Input Variables
+let rate = 2.5;
 
 //Functions
 function init() {
@@ -41,7 +48,8 @@ function init() {
         uniformLocations: {
             projectionMatrix: gl.getUniformLocation(JuliaShaderProgram, 'uProjectionMatrix'),
             modelViewMatrix: gl.getUniformLocation(JuliaShaderProgram, 'uModelViewMatrix'),
-            seed: gl.getUniformLocation(JuliaShaderProgram, 'uSeed')
+            seed: gl.getUniformLocation(JuliaShaderProgram, 'uSeed'),
+            multiplyer: gl.getUniformLocation(JuliaShaderProgram, 'multiplyer')
         },
     };
 
@@ -53,44 +61,59 @@ function init() {
     update();
 }
 function initInputs() {
+    getElement("#aInitial").value = jSeedAInitial;
     getElement("#aInitial").oninput = function () {
-        jSeedAInitial = this.value;
-    }
+        jSeedAInitial = parseFloat(this.value);
+    };
+
+    getElement("#bInitial").value = jSeedBInitial;
     getElement("#bInitial").oninput = function () {
-        jSeedBInitial = this.value;
-    }
+        jSeedBInitial = parseFloat(this.value);
+    };
+
     getElement("#aMod").oninput = function () {
         jSeedAInitial = this.value;
-    }
+    };
     getElement("#bMod").oninput = function () {
         jSeedAInitial = this.value;
-    }
+    };
     getElement("#play").onclick = function () { TogglePlayback(); };
 }
-
+let i = 0;
+let j = 0;
 //Update Functions--------------------------------------
 //Call all update functions
 function update() {
+    if(!playback) {requestAnimationFrame(update);return};
     AnalyserUpdate();
     timeUpdate();
     draw();
 
-    let audioDataSum = 0;
-    audioData.forEach(function (element) {audioDataSum += element});
+    let audioDataSum = 1;
+    audioData.forEach(function (element) { 
+        audioDataSum += element;
+    });
 
-    //jSeedA += Math.sin(time / 1000.0) / 750;
-    //jSeedA = jSeedAInitial * Math.sin(time / 10000) / 2;
-    //jSeedB = jSeedBInitial * Math.sin(time / 1000.0 + 1520) / 1.15;
-    jSeedA = jSeedAInitial + Math.sin(time / 1000.0) / 50;
-    jSeedB = jSeedBInitial + Math.sin(audioDataSum / 500) / 500;
+    j += (audioData[16] + Math.pow(audioData[32], 2) + Math.pow(audioData[48], 2) + 1) / audioDataSum;
+
+    i += ((audioDataSum - previousAudioDataSum / 256) / audioData.length) / 1500;
+    
+    jSeedA = (Math.sin(i/rate) + 1) / 2;
+    jSeedB = Math.sin(j/rate);
+
+    rotation += deltaTime * .3;
+    translation = Math.sin((audioData[0] / 255) * 2 * Math.PI) / 5;
+    multiplyer = 2.5 * (1 + (audioDataSum / 256) / audioData.length); 
+
+    previousAudioDataSum = audioDataSum;
 
     requestAnimationFrame(update);
 }
 //Update variables that keep track of time
 function timeUpdate() {
-    let currentTime = new Date();
+    let currentTime = GetPlaybackTime();
     deltaTime = currentTime - time;
-    time = currentTime - startTime;
+    time = currentTime;
 }
 //Render the current scene
 function draw() {
@@ -186,24 +209,49 @@ function draw() {
         jSeedA,
         jSeedB
     );
+    //Send Brightness Multiplyer to Pixel Shader
+    gl.uniform1f(
+        JuliaShader.uniformLocations.multiplyer,
+        multiplyer
+    );
 
     //Draw Calls
     for (let i = 0; i < 4; i++) {
-        const modelViewMatrix = mat4.create();
-        mat4.rotate(modelViewMatrix, modelViewMatrix, -(Math.PI / 4) * (1 + 2 * (i + 1)), [0, 0, -1]);
-        mat4.translate(modelViewMatrix, modelViewMatrix, [1, 0, 0]);
-        mat4.rotate(modelViewMatrix, modelViewMatrix, time / 4000, [0, -1, 0]); mat4.rotate(modelViewMatrix, modelViewMatrix, Math.PI / 2, [1, 0, 0]);
+        {
+            const modelViewMatrix = mat4.create();
+            mat4.rotate(modelViewMatrix, modelViewMatrix, -(Math.PI / 4) * (1 + 2 * (i + 1)), [0, 0, -1]);
+            mat4.translate(modelViewMatrix, modelViewMatrix, [translation, 0, 0]);
+            mat4.rotate(modelViewMatrix, modelViewMatrix, rotation, [0, -1, 0]); mat4.rotate(modelViewMatrix, modelViewMatrix, Math.PI / 2, [1, 0, 0]);
 
-        //Send ModelView Matrix to Vertex Shader
-        gl.uniformMatrix4fv(
-            JuliaShader.uniformLocations.modelViewMatrix,
-            false,
-            modelViewMatrix
-        );
-        const indexCount = 24;
-        const type = gl.UNSIGNED_SHORT;
-        const offset = 0;
-        gl.drawElements(gl.TRIANGLES, indexCount, type, offset);
+            //Send ModelView Matrix to Vertex Shader
+            gl.uniformMatrix4fv(
+                JuliaShader.uniformLocations.modelViewMatrix,
+                false,
+                modelViewMatrix
+            );
+            const indexCount = 24;
+            const type = gl.UNSIGNED_SHORT;
+            const offset = 0;
+            gl.drawElements(gl.TRIANGLES, indexCount, type, offset);
+        }
+        {
+            const modelViewMatrix = mat4.create();
+            mat4.scale(modelViewMatrix, modelViewMatrix, [1.5, 1.5, 1.5]);
+            mat4.rotate(modelViewMatrix, modelViewMatrix, -(Math.PI / 4) * (1 + 2 * (i + 1)) + rotation / 10, [0, 0, -1]);
+            mat4.translate(modelViewMatrix, modelViewMatrix, [1.5, 0, -2]);
+            mat4.rotate(modelViewMatrix, modelViewMatrix, -rotation, [0, -1, 0]); mat4.rotate(modelViewMatrix, modelViewMatrix, Math.PI / 2, [1, 0, 0]);
+
+            //Send ModelView Matrix to Vertex Shader
+            gl.uniformMatrix4fv(
+                JuliaShader.uniformLocations.modelViewMatrix,
+                false,
+                modelViewMatrix
+            );
+            const indexCount = 24;
+            const type = gl.UNSIGNED_SHORT;
+            const offset = 0;
+            //gl.drawElements(gl.TRIANGLES, indexCount, type, offset);
+        }
     }
     {
         const modelViewMatrix = mat4.create();

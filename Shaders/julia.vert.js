@@ -7,7 +7,7 @@ export { JuliaVertSouce }; const JuliaVertSouce = `
     uniform highp mat4 uProjectionMatrix;
 
     varying highp vec2 textCoord;
-    varying lowp vec4 vColor;
+    varying highp vec4 vColor;
 
     void main() {
         textCoord = vec2(aTexCoord);

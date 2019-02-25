@@ -1,8 +1,9 @@
 export { JuliaFragSouce }; const JuliaFragSouce = `  
     uniform highp vec2 uSeed;
+    uniform highp float multiplyer;
 
     varying highp vec2 textCoord;
-    varying lowp vec4 vColor;
+    varying highp vec4 vColor;
 
 
     void main() {
@@ -14,8 +15,8 @@ export { JuliaFragSouce }; const JuliaFragSouce = `
             
         mediump int final;
         for(int i = 0; i < itter; i++) {
-            lowp float x = (z.x * z.x - z.y * z.y) - uSeed.x;
-            lowp float y = (z.y * z.x + z.x * z.y) - uSeed.y;
+            highp float x = (z.x * z.x - z.y * z.y) - uSeed.x;
+            highp float y = (z.y * z.x + z.x * z.y) - uSeed.y;
 
             if((x * x + y * y) > 4.0) {
                 final = i;
@@ -26,6 +27,6 @@ export { JuliaFragSouce }; const JuliaFragSouce = `
             z.y = y;
         }
         highp float finalf = float(final);
-        gl_FragColor = vColor * (finalf / 50.0) * 1.25;
+        gl_FragColor = vColor * (finalf / 50.0) * multiplyer;
         gl_FragColor.w = 1.0;
     }`;

@@ -1,4 +1,4 @@
-export { AnalyserInit, AnalyserUpdate, audioData, TogglePlayback }
+export { AnalyserInit, AnalyserUpdate, audioData, TogglePlayback, playback, GetPlaybackTime }
 
 let ctx, analyser, audioElement;
 const SAMPLE_COUNT = 64;
@@ -14,7 +14,7 @@ function AnalyserInit() {
     analyser.fftSize = SAMPLE_COUNT;
 
     ctx.createMediaElementSource(audioElement).connect(analyser);
-    //analyser.connect(ctx.destination);
+    analyser.connect(ctx.destination);
 }
 
 function AnalyserUpdate(){
@@ -34,4 +34,8 @@ function TogglePlayback(){
     else{
         audioElement.pause();
     }
+}
+
+function GetPlaybackTime(){
+    return audioElement.currentTime;
 }
