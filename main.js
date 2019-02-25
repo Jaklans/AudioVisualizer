@@ -23,6 +23,7 @@ let rotation = 0;
 let translation = 0;
 let multiplyer = 0;
 let previousAudioDataSum = 0;
+let previousData = [];
 
 //Input Variables
 let rate = 2.5;
@@ -61,26 +62,11 @@ function init() {
     update();
 }
 function initInputs() {
-    getElement("#aInitial").value = jSeedAInitial;
-    getElement("#aInitial").oninput = function () {
-        jSeedAInitial = parseFloat(this.value);
-    };
-
-    getElement("#bInitial").value = jSeedBInitial;
-    getElement("#bInitial").oninput = function () {
-        jSeedBInitial = parseFloat(this.value);
-    };
-
-    getElement("#aMod").oninput = function () {
-        jSeedAInitial = this.value;
-    };
-    getElement("#bMod").oninput = function () {
-        jSeedAInitial = this.value;
-    };
+    
     getElement("#play").onclick = function () { TogglePlayback(); };
 }
-let i = 0;
-let j = 0;
+let x = 0;
+let y = 0;
 //Update Functions--------------------------------------
 //Call all update functions
 function update() {
@@ -94,14 +80,35 @@ function update() {
         audioDataSum += element;
     });
 
-    j += (audioData[16] + Math.pow(audioData[32], 2) + Math.pow(audioData[48], 2) + 1) / audioDataSum;
+    previousData.push(audioDataSum);
+    if(previousData.length > 128) previousData.shift();
 
-    i += ((audioDataSum - previousAudioDataSum / 256) / audioData.length) / 1500;
+    let peaks = [];
+    let slope = -1;
+    for(let i = 0; i < previousData.length - 1; i++){
+        let currentSlope = previousData[i + 1] - previousData[i];
+        if(currentSlope < 0 && slope > 0) peaks.push(i);
+        slope = currentSlope;
+    }
+    let i = 0;
+    let peakAverageInterval = 0;
+    for(; i < peaks.length - 1; i++){
+        peakAverageInterval += peaks[i+1] - peaks[i];
+    }
+    peakAverageInterval /= i;
+    peakAverageInterval *= deltaTime;
+
+    if(isNaN(peakAverageInterval)) {requestAnimationFrame(update);return};
+
+    y += (audioData[16] + Math.pow(audioData[32], 2) + Math.pow(audioData[48], 2) + 1) / audioDataSum;
+
+    x += ((audioDataSum - previousAudioDataSum / 256) / audioData.length) / 1500;
     
-    jSeedA = (Math.sin(i/rate) + 1) / 2;
-    jSeedB = Math.sin(j/rate);
+    jSeedA = (Math.sin(x/rate) + 1) / 2;
+    jSeedB = Math.sin(y/rate);
 
-    rotation += deltaTime * .3;
+    rotation += (Math.PI / 2) * peakAverageInterval / 16; //deltaTime * .3;
+
     translation = Math.sin((audioData[0] / 255) * 2 * Math.PI) / 5;
     multiplyer = 2.5 * (1 + (audioDataSum / 256) / audioData.length); 
 
@@ -267,7 +274,7 @@ function draw() {
         const indexCount = 24;
         const type = gl.UNSIGNED_SHORT;
         const offset = 0;
-        gl.drawElements(gl.TRIANGLES, indexCount, type, offset);
+        //gl.drawElements(gl.TRIANGLES, indexCount, type, offset);
     }
 }
 
