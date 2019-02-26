@@ -1,7 +1,8 @@
+//New ES6 Modules are used to load functions from external files
 import { JuliaFragSouce } from "./Shaders/julia.frag.js";
 import { JuliaVertSouce } from "./Shaders/julia.vert.js";
 import { CreateShaderProgram, InitBuffers } from "./webGLInit.js";
-import { AnalyserInit, AnalyserUpdate, audioData, TogglePlayback, playback, GetPlaybackTime } from "./audioAnalysis.js";
+import { ChangeSong, AnalyserInit, AnalyserUpdate, audioData, TogglePlayback, playback, GetPlaybackTime, SetPlaybackTime, GetEndTime, ChangeBass } from "./audioAnalysis.js";
 "use strict"
 
 //WebGL Environment
@@ -26,6 +27,8 @@ let previousAudioDataSum = 0;
 let previousData = [];
 
 //Input Variables
+let orbits = false, rotating = true, monochrome = false;
+let folded = true;
 let rate = 2.5;
 
 //Functions
@@ -62,55 +65,67 @@ function init() {
     update();
 }
 function initInputs() {
-    
-    getElement("#play").onclick = function () { TogglePlayback(); };
+    getElement("#playbackTime").max = GetEndTime();
+    getElement("#playbackTime").oninput = function () { SetPlaybackTime(this.value); };
+    getElement("#orbits").oninput = function () { orbits = this.checked; };
+    getElement("#rotation").oninput = function () { rotating = this.checked; };
+    getElement("#monochrome").oninput = function () { monochrome = this.checked; };
+    getElement("#play").onclick = function () { TogglePlayback(); if(playback) this.value = "||"; else this.value = "|>"; getElement("#playbackTime").max = GetEndTime();};
+    getElement("#type1").onclick = function () { folded = true; };
+    getElement("#type2").onclick = function () { folded = false; };
+    getElement("#rate").oninput = function () { rate = 5 - this.value; }
+    getElement("#volume").oninput = function () { getElement("#audio").volume = this.value; }
+    getElement("#bass").oninput = function () { ChangeBass(this.value); };
+    getElement("#song").oninput = function () { ChangeSong(this.value); timeUpdate(); getElement("#play").value = "|>";};
+    getElement("#fullscreen").onclick = function () {getElement("#glCanvas").requestFullscreen();}
 }
 let x = 0;
 let y = 0;
 //Update Functions--------------------------------------
 //Call all update functions
 function update() {
-    if(!playback) {requestAnimationFrame(update);return};
+    if (!playback) { requestAnimationFrame(update); return };
     AnalyserUpdate();
     timeUpdate();
     draw();
 
     let audioDataSum = 1;
-    audioData.forEach(function (element) { 
+    audioData.forEach(function (element) {
         audioDataSum += element;
     });
 
     previousData.push(audioDataSum);
-    if(previousData.length > 128) previousData.shift();
+    if (previousData.length > 128) previousData.shift();
 
     let peaks = [];
     let slope = -1;
-    for(let i = 0; i < previousData.length - 1; i++){
+    for (let i = 0; i < previousData.length - 1; i++) {
         let currentSlope = previousData[i + 1] - previousData[i];
-        if(currentSlope < 0 && slope > 0) peaks.push(i);
+        if (currentSlope < 0 && slope > 0) peaks.push(i);
         slope = currentSlope;
     }
     let i = 0;
     let peakAverageInterval = 0;
-    for(; i < peaks.length - 1; i++){
-        peakAverageInterval += peaks[i+1] - peaks[i];
+    for (; i < peaks.length - 1; i++) {
+        peakAverageInterval += peaks[i + 1] - peaks[i];
     }
     peakAverageInterval /= i;
     peakAverageInterval *= deltaTime;
 
-    if(isNaN(peakAverageInterval)) {requestAnimationFrame(update);return};
+    if (isNaN(peakAverageInterval)) { requestAnimationFrame(update); return };
 
     y += (audioData[16] + Math.pow(audioData[32], 2) + Math.pow(audioData[48], 2) + 1) / audioDataSum;
 
-    x += ((audioDataSum - previousAudioDataSum / 256) / audioData.length) / 1500;
-    
-    jSeedA = (Math.sin(x/rate) + 1) / 2;
-    jSeedB = Math.sin(y/rate);
+    x += ((audioDataSum - previousAudioDataSum / 256) / audioData.length) / 600;
 
-    rotation += (Math.PI / 2) * peakAverageInterval / 16; //deltaTime * .3;
+    jSeedA = (Math.sin(x / rate) + 1) / 2;
+    jSeedB = Math.sin(y / rate);
 
-    translation = Math.sin((audioData[0] / 255) * 2 * Math.PI) / 5;
-    multiplyer = 2.5 * (1 + (audioDataSum / 256) / audioData.length); 
+    if (rotating) {
+        rotation += folded ? (Math.PI / 2) * peakAverageInterval / 16 : .005; //deltaTime * .3;
+    }
+    translation = Math.sin((1) * 2 * Math.PI) / 5;
+    multiplyer = 2.5 * (1 + (audioDataSum / 256) / audioData.length);
 
     previousAudioDataSum = audioDataSum;
 
@@ -121,6 +136,7 @@ function timeUpdate() {
     let currentTime = GetPlaybackTime();
     deltaTime = currentTime - time;
     time = currentTime;
+    getElement("#playbackTime").value = time;
 }
 //Render the current scene
 function draw() {
@@ -192,7 +208,7 @@ function draw() {
         const normalize = false;
         const stride = 0;
         const offset = 0;
-        gl.bindBuffer(gl.ARRAY_BUFFER, buffers.color);
+        gl.bindBuffer(gl.ARRAY_BUFFER, monochrome ? buffers.monochrome : buffers.color);
         gl.vertexAttribPointer(
             JuliaShader.attribLocations.vertexColor,
             numComponents,
@@ -227,7 +243,7 @@ function draw() {
         {
             const modelViewMatrix = mat4.create();
             mat4.rotate(modelViewMatrix, modelViewMatrix, -(Math.PI / 4) * (1 + 2 * (i + 1)), [0, 0, -1]);
-            mat4.translate(modelViewMatrix, modelViewMatrix, [translation, 0, 0]);
+            mat4.translate(modelViewMatrix, modelViewMatrix, [folded ? translation : 1, 0, 0]);
             mat4.rotate(modelViewMatrix, modelViewMatrix, rotation, [0, -1, 0]); mat4.rotate(modelViewMatrix, modelViewMatrix, Math.PI / 2, [1, 0, 0]);
 
             //Send ModelView Matrix to Vertex Shader
@@ -241,7 +257,7 @@ function draw() {
             const offset = 0;
             gl.drawElements(gl.TRIANGLES, indexCount, type, offset);
         }
-        {
+        if (orbits) {
             const modelViewMatrix = mat4.create();
             mat4.scale(modelViewMatrix, modelViewMatrix, [1.5, 1.5, 1.5]);
             mat4.rotate(modelViewMatrix, modelViewMatrix, -(Math.PI / 4) * (1 + 2 * (i + 1)) + rotation / 10, [0, 0, -1]);
@@ -257,7 +273,7 @@ function draw() {
             const indexCount = 24;
             const type = gl.UNSIGNED_SHORT;
             const offset = 0;
-            //gl.drawElements(gl.TRIANGLES, indexCount, type, offset);
+            gl.drawElements(gl.TRIANGLES, indexCount, type, offset);
         }
     }
     {
@@ -274,7 +290,7 @@ function draw() {
         const indexCount = 24;
         const type = gl.UNSIGNED_SHORT;
         const offset = 0;
-        //gl.drawElements(gl.TRIANGLES, indexCount, type, offset);
+        gl.drawElements(gl.TRIANGLES, indexCount, type, offset);
     }
 }
 

@@ -101,11 +101,28 @@ function InitBuffers(gl) {
         gl.STATIC_DRAW
     );
 
+    const monochromeColors = [
+        1.0, 1.0, 1.0, 1.0,    
+        1.0, 1.0, 1.0, 1.0, 
+        1.0, 0.0, 0.0, 1.0,   
+        1.0, 0.0, 0.0, 1.0, 
+        1.0, 0.0, 0.0, 1.0,  
+        1.0, 0.0, 0.0, 1.0, 
+    ];
+    const monochromeColorBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, monochromeColorBuffer);
+    gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array(monochromeColors),
+        gl.STATIC_DRAW
+    );
+
     return {
         position: positionBuffer,
         indices: indexBuffer,
         textureCoords: texCoordBuffer,
 
-        color: colorBuffer
+        color: colorBuffer,
+        monochrome: monochromeColorBuffer
     };
 }
